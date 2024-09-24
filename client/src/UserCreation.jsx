@@ -1,9 +1,11 @@
 import axios from 'axios';
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom';
 
 
 const UserCreation = () => {
     const [userData, setUserData] = useState({
+        ProfilePic: '',
         FullName: '',
         UserName: '',
         Password: '',
@@ -14,7 +16,7 @@ const UserCreation = () => {
         IdCreationTime: '',
         Location: '',
     })
-
+    const navigate = useNavigate();
 
     // For checking the availabilty of the USERNAME.
     const [usernameCheck, setUsernameCheck] = useState(true);
@@ -130,11 +132,18 @@ const UserCreation = () => {
         }
     }
 
+
+    const UserLoginCheck = () =>{
+        const USER = localStorage.getItem('UserName');
+        if(USER){
+            navigate(`/${USER}`)
+        }
+    }
+
     useEffect(() =>{
         const UserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const timeAndDate = new Date().toLocaleString('en-GB',{timeZone: UserTimeZone, hour12: false})
         const [date, time] = timeAndDate.split(', ')
-        
         setUserData((prev) => ({
             ...prev,
             IdCreationDate: date,
@@ -143,6 +152,8 @@ const UserCreation = () => {
         ReadUserLocation()
     },[])
 
+
+    useEffect(()=> UserLoginCheck())
 
 
     const handleDataEntry = (e) =>{
@@ -168,36 +179,63 @@ const UserCreation = () => {
         }
     }
     
-    const handleSubmission =async (e) =>{
+    const handleSubmission = async (e) => {
         e.preventDefault();
-
+        
+        // Wait for the username check to complete
         await CheckUserName();
-
-        try{
-            const response = axios.post('http://localhost:4000/create-user', {
-                FullName: userData.FullName,
-                UserName: userData.UserName,
-                Password: userData.Password,
-                Email: userData.Email,
-                ContactNumber: userData.ContactNumber,
-                DateOfBirth: userData.DateOfBirth,
-                CreationDate: userData.IdCreationDate,
-                CreationTime: userData.IdCreationTime ,
-                Location: userData.Location
-            })
-            if(response.status === 200){
-                console.log('Successfully added a new user');
+        
+        // Only proceed if username is available
+        if (usernameCheck) {
+            try {
+                const formData = new FormData();
+                formData.append('ProfilePic', userData.ProfilePic); // append file
+                formData.append('FullName', userData.FullName);
+                formData.append('UserName', userData.UserName);
+                formData.append('Password', userData.Password);
+                formData.append('Email', userData.Email);
+                formData.append('ContactNumber', userData.ContactNumber);
+                formData.append('DateOfBirth', userData.DateOfBirth);
+                formData.append('CreationDate', userData.IdCreationDate);
+                formData.append('CreationTime', userData.IdCreationTime);
+                formData.append('Location', userData.Location);
+    
+                const response = await axios.post('http://localhost:4000/newuser', formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                });
+    
+                if (response.status === 200) {
+                    console.log('Successfully added a new user');
+                    localStorage.setItem('UserName', userData.UserName);
+                    navigate(`/${userData.UserName}`);
+                }
+            } catch (err) {
+                console.error('User not getting created', err);
+                alert('User not getting created');
             }
-        }catch(err ){
-            console.log(err)
+        } else {
+            alert('Username is not available');
         }
-    }
+    };
+    const handleFileChange = (e) => {
+        setUserData((prev) => ({
+            ...prev,
+            ProfilePic: e.target.files[0],
+        }));
+    };
 
 
     return (
         <div className='flex lg:flex-col w-full '>
             <form onSubmit={handleSubmission}>
-            {/* FullName */}
+            {/* Profile Pic */}
+            <div>
+                <label>Add a profile picture(Best Size 500x500)</label>
+                <input type='file' accept='image/*' name='ProfilePic' onChange={handleFileChange} />
+            </div>
+            {/* Full Name */}
             <div>
                 <label className=''>Full Name</label>
                 <input type='text' placeholder='Enter your full name...' name='FullName' value={userData.FullName} onChange={handleDataEntry} />
@@ -267,12 +305,12 @@ const UserCreation = () => {
             {/* Password Entry */}
             <div>
                 <label>Password</label>
-                <input type='text' name='first' value={passwords.first} placeholder='Enter your password' onChange={checkPasswordSyntax}/>
+                <input type='password' name='first' value={passwords.first} placeholder='Enter your password' onChange={checkPasswordSyntax}/>
                 {syntaxError && <h4 className='text-[1vw] text-red-700'>{syntaxMessage}</h4>}
             </div>
             <div>
                 <label>Confirm Password</label>
-                <input type='text' name='second' value={passwords.second} placeholder='Enter password to confirm it' onChange={ConfirmPassword}/>
+                <input type='password' name='second' value={passwords.second} placeholder='Enter password to confirm it' onChange={ConfirmPassword}/>
                 {matchError && <h4 className='text-[1rem] text-red-700'>{matchMessage}</h4>}
                 {!matchError && <h4 className='text-[1rem] text-sky-700'>{matchMessage}</h4>}
             </div>

@@ -2,91 +2,69 @@ const express = require('express');
 const app = express();
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const mysql = require('mysql');
+const db = require('./Database');
+const multer = require('multer');
+const path = require('path');
+
+const CreateUser= require('./Routes/UserCreation');
+const FetchUser = require('./Routes/FetchUserData');
+
+
+
 
 // Middleware
 app.use(cors());
 app.use(express.json());  // Corrected the usage of express.json
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// MySQL connection
-const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: '',
-  database: 'forreactproject',
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+      cb(null, 'uploads/'); // Directory where files will be saved
+  },
+  filename: function (req, file, cb) {
+      cb(null, Date.now() + path.extname(file.originalname)); // Save files with timestamp + original extension
+  },
 });
+const upload = multer({ storage });
 
-db.connect((err) => {
-  if (err) {
-    console.error('Error connecting to the database:', err);
-  } else {
-    console.log('Connected to the MySQL database');
+app.post('/upload', upload.single('image'), (req, res) => {
+  try {
+    const { UserName } = req.body;
+    const imagePath = `/uploads/${req.file.filename}`;
+
+    const setImage = `INSERT INTO userimages(UserName, FilePath) VALUES (?, ?)`;
+    db.query(setImage, [UserName, imagePath], (err, result) => {
+      if (err) {
+        console.log('File not getting saved', err);
+        return res.status(500).send('File Uploading not getting done');
+      }
+      res.status(200).json(result);
+      console
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Error uploading image', error: err });
   }
 });
+app.get('/get-images/:UserName', (req,res)=>{
+  const UserName = req.params.UserName;
+  const fetchImages = `SELECT * FROM userimages WHERE UserName = ?`;
 
-// POST route for form submission
-app.post('/post', (req, res) => {
-  const clientName = req.body.clientName;
-  const description = req.body.description;
-
-  const sql = 'INSERT INTO MyTable (name, description) VALUES (?, ?)';
-  
-  db.query(sql, [clientName, description], (err, result) => {
-    if (err) {
-      console.error('Error inserting data:', err);
-      return res.status(500).send('Database error');
+  db.query(fetchImages, [UserName],(err, result) =>{
+    if(err){
+      return res.status(500).send('No Image Found')
     }
-    console.log('New Data inserted:', result);
-    res.status(200).json({ message: 'Submission Successful' });
-  });
-});
+    res.status(200).json(result);
+  })
 
-// GET route to retrieve data
-app.get('/get-data', (req, res) => {
-  const getData = 'SELECT * FROM MyTable ORDER BY name';
-  
-  db.query(getData, (err, result) => {
-    if (err) {
-      console.error('Error fetching data:', err);
-      return res.status(500).send('Unable to read from DB');
-    }
-    res.status(200).json(result);  // Sending data as JSON
-  });
-});
-
-app.get('/get-data/:name', (req, res) => {
-    const name = req.params.name;  // Use req.params to get the URL parameter
-    
-    const getData = 'SELECT * FROM MyTable WHERE name = ?';  // Corrected SQL syntax
-    
-    db.query(getData, [name], (err, result) => {
-      if (err) {
-        console.error('Error fetching data:', err);
-        return res.status(500).send('Unable to read from DB');
-      }
-      res.status(200).json(result);  // Sending data as JSON
-    });
-  });
+})
 
 
-  app.delete('/delete-post', (req, res) => {
-    const { name, description } = req.query;  // Extract from query parameters
-  
-    const sql = 'DELETE FROM MyTable WHERE name = ? AND description = ?';
-    
-    db.query(sql, [name, description], (err, result) => {
-      if (err) {
-        console.error('Error deleting data:', err);
-        return res.status(500).send('Unable to delete from DB');
-      }
-      else{
-        console.log('Deleted Something')
-        res.status(200).json({ message: 'Deleted successfully' });
-      }
 
-    });
-  });
+app.post('/newuser',CreateUser);
+app.get('/fetchuser/:UserName', FetchUser);
+
+
+
   
   // });
 // Start the server
